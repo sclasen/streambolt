@@ -1,8 +1,10 @@
 package streambolt
 
 import (
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -233,57 +235,68 @@ func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSeq
 func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (string, error) {
 
 	latest := startingAfter
-	log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator after=%s", startingAfter)
-	gsi := &kinesis.GetShardIteratorInput{
-		StreamName:             aws.String(s.Stream),
-		ShardID:                aws.String(s.Shard),
-		ShardIteratorType:      aws.String(kinesis.ShardIteratorTypeAfterSequenceNumber),
-		StartingSequenceNumber: aws.String(startingAfter),
-	}
-
-	if startingAfter == BootstrapSequence {
-		gsi.ShardIteratorType = aws.String(kinesis.ShardIteratorTypeTrimHorizon)
-		gsi.StartingSequenceNumber = nil
-	}
-
-	it, err := s.KinesisClient.GetShardIterator(gsi)
-
-	if err != nil {
-		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator-error error=%s", err)
-		return "", err
-	}
-
-	iterator := it.ShardIterator
-
+ITERATOR:
 	for {
-		gr, err := s.KinesisClient.GetRecords(&kinesis.GetRecordsInput{
-			ShardIterator: iterator,
-		})
+
+		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator after=%s", latest)
+		gsi := &kinesis.GetShardIteratorInput{
+			StreamName:             aws.String(s.Stream),
+			ShardID:                aws.String(s.Shard),
+			ShardIteratorType:      aws.String(kinesis.ShardIteratorTypeAfterSequenceNumber),
+			StartingSequenceNumber: aws.String(latest),
+		}
+
+		if latest == BootstrapSequence {
+			gsi.ShardIteratorType = aws.String(kinesis.ShardIteratorTypeTrimHorizon)
+			gsi.StartingSequenceNumber = nil
+		}
+
+		it, err := s.KinesisClient.GetShardIterator(gsi)
+
 		if err != nil {
-			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records-error error=%s", err)
+			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator-error error=%s", err)
 			return "", err
 		}
 
-		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
+		iterator := it.ShardIterator
 
-		iterator = gr.NextShardIterator
+		for {
+			gr, err := s.KinesisClient.GetRecords(&kinesis.GetRecordsInput{
+				ShardIterator: iterator,
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); ok {
+					if aerr.Code() == "ExpiredIteratorException" {
+						break ITERATOR
+					}
+				} else {
+					log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records-error error=%s", err)
+					return "", err
+				}
+			}
 
-		err = s.Generator.OnRecords(tx, gr)
-		if err != nil {
-			log.Printf("component=shard-snapshotter fn=update-snapshot at=on-records-error error=%s", err)
-			return "", err
-		}
+			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
 
-		if r := len(gr.Records); r > 0 {
-			latest = *gr.Records[r-1].SequenceNumber
-		}
+			iterator = gr.NextShardIterator
 
-		if *gr.MillisBehindLatest < s.DoneLag {
-			log.Printf("component=shard-snapshotter fn=update-snapshot at=done behind=%d done-lag=%d", *gr.MillisBehindLatest, s.DoneLag)
-			return latest, nil
+			err = s.Generator.OnRecords(tx, gr)
+			if err != nil {
+				log.Printf("component=shard-snapshotter fn=update-snapshot at=on-records-error error=%s", err)
+				return "", err
+			}
+
+			if r := len(gr.Records); r > 0 {
+				latest = *gr.Records[r-1].SequenceNumber
+			}
+
+			if *gr.MillisBehindLatest < s.DoneLag {
+				log.Printf("component=shard-snapshotter fn=update-snapshot at=done behind=%d done-lag=%d", *gr.MillisBehindLatest, s.DoneLag)
+				return latest, nil
+			}
 		}
 	}
 
+	return "", errors.New("unreachable reached")
 }
 
 func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error {
