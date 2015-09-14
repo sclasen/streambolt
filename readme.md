@@ -64,14 +64,12 @@ Snapshot Consumer
 
 ```go
 finder := &ShardSnapshotFinder{
-				KinesisClient:  kc,
 				S3Client:       s3c,
 				SnapshotBucket: bucket,
 				SnapshotPath:   snapshotPath,
 				LocalPath:      localPath,
 				Stream:         stream,
 				Shard:          shardID,
-
 			}
 
 ss, err := finder.FindLatestSnapshot()

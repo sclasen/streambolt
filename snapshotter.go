@@ -31,7 +31,6 @@ type SnapshotGenerator interface {
 
 type ShardSnapshotFinder struct {
 	S3Client       s3iface.S3API
-	KinesisClient  kinesisiface.KinesisAPI
 	SnapshotBucket string
 	SnapshotPath   string
 	LocalPath      string
@@ -54,7 +53,6 @@ type ShardSnapshotter struct {
 func (s *ShardSnapshotter) Finder() *ShardSnapshotFinder {
 	return &ShardSnapshotFinder{
 		S3Client:       s.S3Client,
-		KinesisClient:  s.KinesisClient,
 		SnapshotBucket: s.SnapshotBucket,
 		SnapshotPath:   s.SnapshotPath,
 		LocalPath:      s.LocalPath,

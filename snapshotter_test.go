@@ -20,7 +20,7 @@ import (
 func TestSnapshots(t *testing.T) {
 	s := &ShardSnapshotter{
 		Stream:       "my-stream-name",
-		ShardID:        "shardId-000000000000",
+		ShardID:      "shardId-000000000000",
 		SnapshotPath: "snapshots",
 		LocalPath:    "local",
 	}
@@ -111,7 +111,7 @@ func TestIntegration(t *testing.T) {
 				SnapshotPath:   snapshotPath,
 				LocalPath:      localPath,
 				Stream:         stream,
-				ShardID:          *o.StreamDescription.Shards[0].ShardID,
+				ShardID:        *o.StreamDescription.Shards[0].ShardID,
 				DoneLag:        10,
 				Generator:      &TestSnapshotGen{},
 			}
