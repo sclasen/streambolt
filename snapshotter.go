@@ -235,7 +235,6 @@ func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSeq
 func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (string, error) {
 
 	latest := startingAfter
-ITERATOR:
 	for {
 
 		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator after=%s", latest)
@@ -267,7 +266,7 @@ ITERATOR:
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); ok {
 					if aerr.Code() == "ExpiredIteratorException" {
-						break ITERATOR
+						break
 					}
 				} else {
 					log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records-error error=%s", err)
