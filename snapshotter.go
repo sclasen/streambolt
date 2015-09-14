@@ -28,36 +28,36 @@ type SnapshotGenerator interface {
 }
 
 type ShardSnapshotFinder struct {
-	s3api          s3iface.S3API
-	kapi           kinesisiface.KinesisAPI
-	snapshotBucket string
-	snapshotPath   string
-	localPath      string
-	stream         string
-	shard          string
+	S3Client       s3iface.S3API
+	KinesisClient  kinesisiface.KinesisAPI
+	SnapshotBucket string
+	SnapshotPath   string
+	LocalPath      string
+	Stream         string
+	ShardID        string
 }
 
 type ShardSnapshotter struct {
-	s3api          s3iface.S3API
-	kapi           kinesisiface.KinesisAPI
-	generator      SnapshotGenerator
-	snapshotBucket string
-	snapshotPath   string
-	localPath      string
-	stream         string
-	shard          string
-	doneLag        int64
+	S3Client       s3iface.S3API
+	KinesisClient  kinesisiface.KinesisAPI
+	Generator      SnapshotGenerator
+	SnapshotBucket string
+	SnapshotPath   string
+	LocalPath      string
+	Stream         string
+	Shard          string
+	DoneLag        int64
 }
 
 func (s *ShardSnapshotter) Finder() *ShardSnapshotFinder {
 	return &ShardSnapshotFinder{
-		s3api:          s.s3api,
-		kapi:           s.kapi,
-		snapshotBucket: s.snapshotBucket,
-		snapshotPath:   s.snapshotPath,
-		localPath:      s.localPath,
-		stream:         s.stream,
-		shard:          s.shard,
+		S3Client:       s.S3Client,
+		KinesisClient:  s.KinesisClient,
+		SnapshotBucket: s.SnapshotBucket,
+		SnapshotPath:   s.SnapshotPath,
+		LocalPath:      s.LocalPath,
+		Stream:         s.Stream,
+		ShardID:        s.Shard,
 	}
 }
 
@@ -117,8 +117,8 @@ func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
 		}
 		return false
 	}
-	err := s.s3api.ListObjectsPages(&s3.ListObjectsInput{
-		Bucket: aws.String(s.snapshotBucket),
+	err := s.S3Client.ListObjectsPages(&s3.ListObjectsInput{
+		Bucket: aws.String(s.SnapshotBucket),
 		Prefix: aws.String(s.S3Prefix()),
 	}, eachPage)
 
@@ -158,7 +158,7 @@ func (s *ShardSnapshotter) BootstrapSnapshot() (*Snapshot, error) {
 	updatedSeq := ""
 
 	err = db.Update(func(tx *bolt.Tx) error {
-		seq, err := s.generator.Bootstrap(tx)
+		seq, err := s.Generator.Bootstrap(tx)
 		if err != nil {
 			log.Printf("component=shard-snapshotter fn=bootstrap-snapshot at=error error=%s", err)
 			return err
@@ -177,8 +177,8 @@ func (s *ShardSnapshotter) BootstrapSnapshot() (*Snapshot, error) {
 }
 
 func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
-	out, err := s.s3api.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(s.snapshotBucket),
+	out, err := s.S3Client.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(s.SnapshotBucket),
 		Key:    aws.String(snapshot.S3Key),
 	})
 	if err != nil {
@@ -203,7 +203,7 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 }
 
 func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
-	copy := (fmt.Sprintf("%s/working-%d", s.localPath, time.Now().UnixNano()))
+	copy := (fmt.Sprintf("%s/working-%d", s.LocalPath, time.Now().UnixNano()))
 	return copy, exec.Command("mv", snapshot.LocalFile, copy).Run()
 }
 
@@ -218,7 +218,7 @@ func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSeq
 	updatedSeq := lastSequence
 
 	err = db.Update(func(tx *bolt.Tx) error {
-		err = s.generator.OnStart(tx)
+		err = s.Generator.OnStart(tx)
 		if err != nil {
 			log.Printf("component=shard-snapshotter fn=update-working-copy at=on-start-error error=%s", err)
 			return err
@@ -235,8 +235,8 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 	latest := startingAfter
 	log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator after=%s", startingAfter)
 	gsi := &kinesis.GetShardIteratorInput{
-		StreamName:             aws.String(s.stream),
-		ShardID:                aws.String(s.shard),
+		StreamName:             aws.String(s.Stream),
+		ShardID:                aws.String(s.Shard),
 		ShardIteratorType:      aws.String(kinesis.ShardIteratorTypeAfterSequenceNumber),
 		StartingSequenceNumber: aws.String(startingAfter),
 	}
@@ -246,7 +246,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 		gsi.StartingSequenceNumber = nil
 	}
 
-	it, err := s.kapi.GetShardIterator(gsi)
+	it, err := s.KinesisClient.GetShardIterator(gsi)
 
 	if err != nil {
 		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator-error error=%s", err)
@@ -256,7 +256,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 	iterator := it.ShardIterator
 
 	for {
-		gr, err := s.kapi.GetRecords(&kinesis.GetRecordsInput{
+		gr, err := s.KinesisClient.GetRecords(&kinesis.GetRecordsInput{
 			ShardIterator: iterator,
 		})
 		if err != nil {
@@ -268,7 +268,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 
 		iterator = gr.NextShardIterator
 
-		err = s.generator.OnRecords(tx, gr)
+		err = s.Generator.OnRecords(tx, gr)
 		if err != nil {
 			log.Printf("component=shard-snapshotter fn=update-snapshot at=on-records-error error=%s", err)
 			return "", err
@@ -278,8 +278,8 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 			latest = *gr.Records[r-1].SequenceNumber
 		}
 
-		if *gr.MillisBehindLatest < s.doneLag {
-			log.Printf("component=shard-snapshotter fn=update-snapshot at=done behind=%d done-lag=%d", *gr.MillisBehindLatest, s.doneLag)
+		if *gr.MillisBehindLatest < s.DoneLag {
+			log.Printf("component=shard-snapshotter fn=update-snapshot at=done behind=%d done-lag=%d", *gr.MillisBehindLatest, s.DoneLag)
 			return latest, nil
 		}
 	}
@@ -297,8 +297,8 @@ func (s *ShardSnapshotter) UploadSnapshot(snapshot Snapshot) error {
 		return err
 	}
 
-	_, err = s.s3api.PutObject(&s3.PutObjectInput{
-		Bucket: aws.String(s.snapshotBucket),
+	_, err = s.S3Client.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String(s.SnapshotBucket),
 		Key:    aws.String(snapshot.S3Key),
 		Body:   f,
 	})
@@ -308,7 +308,7 @@ func (s *ShardSnapshotter) UploadSnapshot(snapshot Snapshot) error {
 }
 
 func (s *ShardSnapshotFinder) S3Prefix() string {
-	return fmt.Sprintf("%s/%s-%s-", s.snapshotPath, s.stream, s.shard)
+	return fmt.Sprintf("%s/%s-%s-", s.SnapshotPath, s.Stream, s.ShardID)
 }
 
 type Snapshot struct {
@@ -319,7 +319,7 @@ type Snapshot struct {
 }
 
 func (s *ShardSnapshotFinder) SnapshotFromS3Key(s3key string) *Snapshot {
-	prefixes := []string{s.snapshotPath, "/", s.stream, "-", s.shard, "-"}
+	prefixes := []string{s.SnapshotPath, "/", s.Stream, "-", s.ShardID, "-"}
 	suffix := ".boltdb"
 
 	trimmed := s3key
@@ -344,9 +344,9 @@ func (s *ShardSnapshotFinder) SnapshotFromS3Key(s3key string) *Snapshot {
 }
 
 func (s *ShardSnapshotFinder) SnapshotFromKinesisSeq(kinesisSeq string) Snapshot {
-	snapshotFilename := fmt.Sprintf("%s-%s-%s.boltdb", s.stream, s.shard, kinesisSeq)
-	s3Key := fmt.Sprintf("%s/%s", s.snapshotPath, snapshotFilename)
-	local := fmt.Sprintf("%s/%s", s.localPath, snapshotFilename)
+	snapshotFilename := fmt.Sprintf("%s-%s-%s.boltdb", s.Stream, s.ShardID, kinesisSeq)
+	s3Key := fmt.Sprintf("%s/%s", s.SnapshotPath, snapshotFilename)
+	local := fmt.Sprintf("%s/%s", s.LocalPath, snapshotFilename)
 	local, err := filepath.Abs(local)
 	if err != nil {
 		panic(err)

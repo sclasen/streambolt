@@ -19,14 +19,14 @@ import (
 
 func TestSnapshots(t *testing.T) {
 	s := &ShardSnapshotter{
-		stream:       "my-stream-name",
-		shard:        "shardId-000000000000",
-		snapshotPath: "snapshots",
-		localPath:    "local",
+		Stream:       "my-stream-name",
+		Shard:        "shardId-000000000000",
+		SnapshotPath: "snapshots",
+		LocalPath:    "local",
 	}
 	last := "49553601453818580880174946772985676824316826975981273090"
 
-	key := s.Finder().SnapshotFromS3Key(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.snapshotPath, s.stream, s.shard, last))
+	key := s.Finder().SnapshotFromS3Key(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.SnapshotPath, s.Stream, s.Shard, last))
 	if key == nil {
 		t.Fatal("NULL KEY")
 	}
@@ -38,15 +38,15 @@ func TestSnapshots(t *testing.T) {
 			t.Fatal(snapshot.KinesisSeq, "NOT", last)
 		}
 
-		if local, err := filepath.Abs(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.localPath, s.stream, s.shard, last)); err != nil || local != snapshot.LocalFile {
+		if local, err := filepath.Abs(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.LocalPath, s.Stream, s.Shard, last)); err != nil || local != snapshot.LocalFile {
 			t.Fatal("LOCAL NOT", snapshot.LocalFile)
 		}
 
-		if snapshot.SnapshotFilename != fmt.Sprintf("%s-%s-%s.boltdb", s.stream, s.shard, last) {
+		if snapshot.SnapshotFilename != fmt.Sprintf("%s-%s-%s.boltdb", s.Stream, s.Shard, last) {
 			t.Fatal("SNAP NOT", snapshot.SnapshotFilename)
 		}
 
-		if snapshot.S3Key != fmt.Sprintf("%s/%s-%s-%s.boltdb", s.snapshotPath, s.stream, s.shard, last) {
+		if snapshot.S3Key != fmt.Sprintf("%s/%s-%s-%s.boltdb", s.SnapshotPath, s.Stream, s.Shard, last) {
 			t.Fatal("S3  NOT", snapshot.S3Key)
 		}
 
@@ -105,15 +105,15 @@ func TestIntegration(t *testing.T) {
 
 		if *o.StreamDescription.StreamStatus == kinesis.StreamStatusActive {
 			snapshotter = &ShardSnapshotter{
-				kapi:           kc,
-				s3api:          s3c,
-				snapshotBucket: bucket,
-				snapshotPath:   snapshotPath,
-				localPath:      localPath,
-				stream:         stream,
-				shard:          *o.StreamDescription.Shards[0].ShardID,
-				doneLag:        10,
-				generator:      &TestSnapshotGen{},
+				KinesisClient:  kc,
+				S3Client:       s3c,
+				SnapshotBucket: bucket,
+				SnapshotPath:   snapshotPath,
+				LocalPath:      localPath,
+				Stream:         stream,
+				Shard:          *o.StreamDescription.Shards[0].ShardID,
+				DoneLag:        10,
+				Generator:      &TestSnapshotGen{},
 			}
 			break
 		}
@@ -124,7 +124,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatal("NIL SNAPSHOTTER")
 	}
 
-	total, err := PutData(snapshotter.kapi, snapshotter.stream)
+	total, err := PutData(snapshotter.KinesisClient, snapshotter.Stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(total, verifyTotal)
 	}
 
-	secondTotal, err := PutData(snapshotter.kapi, snapshotter.stream)
+	secondTotal, err := PutData(snapshotter.KinesisClient, snapshotter.Stream)
 	if err != nil {
 		t.Fatal(err)
 	}
