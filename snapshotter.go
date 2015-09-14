@@ -203,7 +203,7 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 }
 
 func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
-	copy := (fmt.Sprintf("%s/working-%d", s.LocalPath, time.Now().UnixNano()))
+	copy := (fmt.Sprintf("%s/working-%s-%s-%d", s.LocalPath, s.Stream, s.ShardID, time.Now().UnixNano()))
 	return copy, exec.Command("mv", snapshot.LocalFile, copy).Run()
 }
 
