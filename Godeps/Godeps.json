@@ -1,0 +1,75 @@
+{
+	"ImportPath": "github.com/sclasen/streambolt",
+	"GoVersion": "go1.4",
+	"Deps": [
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/aws",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/endpoints",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/json/jsonutil",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/jsonrpc",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/query",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/rest",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/restxml",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/protocol/xml/xmlutil",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/internal/signer/v4",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/kinesis",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/s3",
+			"Comment": "v0.6.7-20-gab85612",
+			"Rev": "ab85612d91c52e8f560e57d9ebdcf9682eaa24c7"
+		},
+		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "v1.0-125-g033d4ec",
+			"Rev": "033d4ec028192f38aef67ae47bd7b89f343145b5"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/random",
+			"Comment": "v1.4.1-5164-g0f85fad",
+			"Rev": "0f85fadb4ec1aa3d0270351fc72fa9a70cffd3b9"
+		},
+		{
+			"ImportPath": "github.com/vaughan0/go-ini",
+			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		}
+	]
+}
