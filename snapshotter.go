@@ -47,7 +47,7 @@ type ShardSnapshotter struct {
 	SnapshotPath   string
 	LocalPath      string
 	Stream         string
-	Shard          string
+	ShardID        string
 	DoneLag        int64
 }
 
@@ -59,7 +59,7 @@ func (s *ShardSnapshotter) Finder() *ShardSnapshotFinder {
 		SnapshotPath:   s.SnapshotPath,
 		LocalPath:      s.LocalPath,
 		Stream:         s.Stream,
-		ShardID:        s.Shard,
+		ShardID:        s.ShardID,
 	}
 }
 
@@ -240,7 +240,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator after=%s", latest)
 		gsi := &kinesis.GetShardIteratorInput{
 			StreamName:             aws.String(s.Stream),
-			ShardID:                aws.String(s.Shard),
+			ShardID:                aws.String(s.ShardID),
 			ShardIteratorType:      aws.String(kinesis.ShardIteratorTypeAfterSequenceNumber),
 			StartingSequenceNumber: aws.String(latest),
 		}
