@@ -117,10 +117,13 @@ func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
 		}
 		return false
 	}
-	err := s.S3Client.ListObjectsPages(&s3.ListObjectsInput{
+
+	in := &s3.ListObjectsInput{
 		Bucket: aws.String(s.SnapshotBucket),
 		Prefix: aws.String(s.S3Prefix()),
-	}, eachPage)
+	}
+
+	err := s.S3Client.ListObjectsPages(in, eachPage)
 
 	if err != nil {
 		log.Printf("component=shard-snapshotter fn=snapshot-shard at=list-objects-error error=%s", err)
