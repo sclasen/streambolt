@@ -61,22 +61,22 @@ func (s *ShardSnapshotter) Finder() *ShardSnapshotFinder {
 	}
 }
 
-func (s *ShardSnapshotter) SnapshotShard() error {
+func (s *ShardSnapshotter) SnapshotShard() (*Snapshot, error) {
 	finder := s.Finder()
 	latest, err := finder.FindLatestSnapshot()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if latest != nil {
 		err = finder.DownloadSnapshot(*latest)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		l, err := s.BootstrapSnapshot()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		latest = l
 	}
@@ -84,23 +84,38 @@ func (s *ShardSnapshotter) SnapshotShard() error {
 	if latest != nil {
 		working, err := s.ToWorkingCopy(*latest)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		updatedSeq, err := s.UpdateWorkingCopy(working, latest.KinesisSeq)
 		if err != nil {
-			return err
+			log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-updating-working-copy removing=%s", working)
+			re := os.Remove(working)
+			if re != nil {
+				log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-removing-working-copy copy=%s", working)
+			}
+			return nil, err
 		}
 		updatedSnapshot := finder.SnapshotFromKinesisSeq(updatedSeq)
 		err = s.FromWorkingCopy(working, updatedSnapshot)
 		if err != nil {
-			return err
+			if err != nil {
+				log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-moving-working-copy removing=%s", working)
+				re := os.Remove(working)
+				if re != nil {
+					log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-removing-working-copy copy=%s", working)
+				}
+				return nil, err
+			}
+			return nil, err
 		}
 		err = s.UploadSnapshot(updatedSnapshot)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		return &updatedSnapshot, nil
 	}
-	return nil
+
+	return nil, errors.New("no snapshot generated")
 }
 
 func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {

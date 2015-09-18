@@ -129,13 +129,13 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = snapshotter.SnapshotShard()
+	ss, err := snapshotter.SnapshotShard()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	finder := snapshotter.Finder()
-	ss, err := finder.FindLatestSnapshot()
+	ss, err = finder.FindLatestSnapshot()
 	if err != nil || ss == nil {
 		t.Fatal(err, ss)
 	}
@@ -164,12 +164,12 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = snapshotter.SnapshotShard()
+	ss2, err := snapshotter.SnapshotShard()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ss2, err := finder.FindLatestSnapshot()
+	ss2, err = finder.FindLatestSnapshot()
 	if err != nil || ss2 == nil {
 		t.Fatal(err, ss2)
 	}
@@ -191,6 +191,11 @@ func TestIntegration(t *testing.T) {
 
 	if total+secondTotal != secondVerifyTotal {
 		t.Fatal(total, secondTotal, secondVerifyTotal)
+	}
+
+	err = os.Remove(ss2.LocalFile)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 }
