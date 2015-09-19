@@ -50,6 +50,8 @@ type ShardSnapshotter struct {
 	DoneLag        int64
 }
 
+//TODO ListSnapshots and DeleteShapshot for GCing. or maybe just GCBefore(time.Time)
+
 func (s *ShardSnapshotter) Finder() *ShardSnapshotFinder {
 	return &ShardSnapshotFinder{
 		S3Client:       s.S3Client,
