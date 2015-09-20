@@ -198,6 +198,11 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	out, err := snapshotter.DeleteSnapshotsInS3OlderThan(1 * time.Nanosecond)
+	if err != nil || len(out.Errors) > 0 {
+		t.Fatal(out, err)
+	}
+
 }
 
 func PutData(kc kinesisiface.KinesisAPI, stream string) (int, error) {

@@ -120,7 +120,7 @@ func (s *ShardSnapshotter) SnapshotShard() (*Snapshot, error) {
 	return nil, errors.New("no snapshot generated")
 }
 
-func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
+func (s *ShardSnapshotFinder) FindSnapshots() ([]Snapshot, error) {
 	snapshots := []Snapshot{}
 	eachPage := func(o *s3.ListObjectsOutput, _ bool) bool {
 		log.Printf("component=shard-snapshotter fn=snapshot-shard at=list-objects-page")
@@ -141,6 +141,14 @@ func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
 
 	if err != nil {
 		log.Printf("component=shard-snapshotter fn=snapshot-shard at=list-objects-error error=%s", err)
+		return nil, err
+	}
+	return snapshots, nil
+}
+
+func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
+	snapshots, err := s.FindSnapshots()
+	if err != nil {
 		return nil, err
 	}
 	latest := big.NewInt(0)
@@ -331,6 +339,49 @@ func (s *ShardSnapshotter) UploadSnapshot(snapshot Snapshot) error {
 	})
 
 	return err
+
+}
+
+func (s *ShardSnapshotter) DeleteSnapshotsInS3OlderThan(age time.Duration) (*s3.DeleteObjectsOutput, error) {
+	deleteBefore := time.Now().Add(-age)
+	toDelete := []*s3.ObjectIdentifier{}
+	eachPage := func(o *s3.ListObjectsOutput, _ bool) bool {
+		for _, c := range o.Contents {
+			if c.LastModified.Before(deleteBefore) {
+				oi := &s3.ObjectIdentifier{
+					Key: c.Key,
+				}
+				log.Printf("component=shard-snapshotter fn=delete-snapshots at=found-deleteable modified=%s key=%s", *c.LastModified, *c.Key)
+				toDelete = append(toDelete, oi)
+			}
+		}
+		return true
+	}
+
+	err := s.S3Client.ListObjectsPages(&s3.ListObjectsInput{
+		Prefix: aws.String(s.Finder().S3Prefix()),
+		Bucket: aws.String(s.SnapshotBucket),
+	}, eachPage)
+
+	if err != nil {
+		log.Printf("component=shard-snapshotter fn=delete-snapshots at=list-error error=%s", err)
+		return nil, err
+	}
+
+	out, err := s.S3Client.DeleteObjects(&s3.DeleteObjectsInput{
+		Bucket: aws.String(s.SnapshotBucket),
+		Delete: &s3.Delete{
+			Objects: toDelete,
+		},
+	})
+
+	if err != nil {
+		log.Printf("component=shard-snapshotter fn=delete-snapshots at=delete-objects-error error=%s", err)
+	} else {
+		log.Printf("component=shard-snapshotter fn=delete-snapshots at=sent-delete-objects num-errors=%d", len(out.Errors))
+	}
+
+	return out, err
 
 }
 

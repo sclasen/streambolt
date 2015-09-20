@@ -33,8 +33,8 @@ var key = cli.StringFlag{
 }
 
 var db = cli.StringFlag{
-	Name:  "db, d",
-	Usage: ".boltdb file to inspect",
+	Name:   "db, d",
+	Usage:  ".boltdb file to inspect",
 	EnvVar: "BOLTDB",
 }
 
@@ -132,7 +132,7 @@ func withBuckets(c *cli.Context, view func([]string, *bolt.Tx) error) {
 		println("No --buckets")
 	} else {
 		withBolt(c, func(tx *bolt.Tx) error {
-			return view(strings.Split(b,","), tx)
+			return view(strings.Split(b, ","), tx)
 		})
 	}
 }
