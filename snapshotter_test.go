@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/boltdb/bolt"
-	"github.com/docker/docker/pkg/random"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"math/rand"
 )
 
 func TestSnapshots(t *testing.T) {
@@ -206,10 +206,10 @@ func TestIntegration(t *testing.T) {
 }
 
 func PutData(kc kinesisiface.KinesisAPI, stream string) (int, error) {
-	r := random.Rand
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	total := 0
 	records := []*kinesis.PutRecordsRequestEntry{}
-	for i := 1; i <= 100; i++ {
+	for i := 1; i <= r.Intn(1000); i++ {
 		k := strconv.Itoa(i)
 		v := r.Int()
 		total += v
