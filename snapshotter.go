@@ -368,6 +368,11 @@ func (s *ShardSnapshotter) DeleteSnapshotsInS3OlderThan(age time.Duration) (*s3.
 		return nil, err
 	}
 
+	if len(toDelete) == 0 {
+		log.Printf("component=shard-snapshotter fn=delete-snapshots at=no-eligible-snapshots")
+		return &s3.DeleteObjectsOutput{}, nil
+	}
+
 	out, err := s.S3Client.DeleteObjects(&s3.DeleteObjectsInput{
 		Bucket: aws.String(s.SnapshotBucket),
 		Delete: &s3.Delete{

@@ -8,13 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/boltdb/bolt"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-	"math/rand"
 )
 
 func TestSnapshots(t *testing.T) {
@@ -200,6 +200,11 @@ func TestIntegration(t *testing.T) {
 
 	out, err := snapshotter.DeleteSnapshotsInS3OlderThan(1 * time.Nanosecond)
 	if err != nil || len(out.Errors) > 0 {
+		t.Fatal(out, err)
+	}
+
+	out, err = snapshotter.DeleteSnapshotsInS3OlderThan(1000 * time.Hour)
+	if err != nil || len(out.Errors) > 0 || len(out.Deleted) > 0 {
 		t.Fatal(out, err)
 	}
 
