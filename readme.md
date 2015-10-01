@@ -45,7 +45,7 @@ snapshotter := &ShardSnapshotter{
 				SnapshotPath:   snapshotPath,
 				LocalPath:      localPath,
 				Stream:         stream,
-				ShardID:        shardID,
+				ShardId:        shardId,
 				DoneLag:        10,
 				Generator:      &MySnapshotGen{},
 			}
@@ -69,7 +69,7 @@ finder := &ShardSnapshotFinder{
 				SnapshotPath:   snapshotPath,
 				LocalPath:      localPath,
 				Stream:         stream,
-				Shard:          shardID,
+				Shard:          shardId,
 			}
 
 ss, err := finder.FindLatestSnapshot()
