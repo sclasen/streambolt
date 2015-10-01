@@ -20,13 +20,13 @@ import (
 func TestSnapshots(t *testing.T) {
 	s := &ShardSnapshotter{
 		Stream:       "my-stream-name",
-		ShardID:      "shardId-000000000000",
+		ShardId:      "shardId-000000000000",
 		SnapshotPath: "snapshots",
 		LocalPath:    "local",
 	}
 	last := "49553601453818580880174946772985676824316826975981273090"
 
-	key := s.Finder().SnapshotFromS3Key(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.SnapshotPath, s.Stream, s.ShardID, last))
+	key := s.Finder().SnapshotFromS3Key(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.SnapshotPath, s.Stream, s.ShardId, last))
 	if key == nil {
 		t.Fatal("NULL KEY")
 	}
@@ -38,15 +38,15 @@ func TestSnapshots(t *testing.T) {
 			t.Fatal(snapshot.KinesisSeq, "NOT", last)
 		}
 
-		if local, err := filepath.Abs(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.LocalPath, s.Stream, s.ShardID, last)); err != nil || local != snapshot.LocalFile {
+		if local, err := filepath.Abs(fmt.Sprintf("%s/%s-%s-%s.boltdb", s.LocalPath, s.Stream, s.ShardId, last)); err != nil || local != snapshot.LocalFile {
 			t.Fatal("LOCAL NOT", snapshot.LocalFile)
 		}
 
-		if snapshot.SnapshotFilename != fmt.Sprintf("%s-%s-%s.boltdb", s.Stream, s.ShardID, last) {
+		if snapshot.SnapshotFilename != fmt.Sprintf("%s-%s-%s.boltdb", s.Stream, s.ShardId, last) {
 			t.Fatal("SNAP NOT", snapshot.SnapshotFilename)
 		}
 
-		if snapshot.S3Key != fmt.Sprintf("%s/%s-%s-%s.boltdb", s.SnapshotPath, s.Stream, s.ShardID, last) {
+		if snapshot.S3Key != fmt.Sprintf("%s/%s-%s-%s.boltdb", s.SnapshotPath, s.Stream, s.ShardId, last) {
 			t.Fatal("S3  NOT", snapshot.S3Key)
 		}
 
@@ -111,7 +111,7 @@ func TestIntegration(t *testing.T) {
 				SnapshotPath:   snapshotPath,
 				LocalPath:      localPath,
 				Stream:         stream,
-				ShardID:        *o.StreamDescription.Shards[0].ShardID,
+				ShardId:        *o.StreamDescription.Shards[0].ShardId,
 				DoneLag:        10,
 				Generator:      &TestSnapshotGen{},
 			}

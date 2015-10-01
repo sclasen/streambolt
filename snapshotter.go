@@ -3,13 +3,6 @@ package streambolt
 import (
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/boltdb/bolt"
 	"io"
 	"log"
 	"math/big"
@@ -19,6 +12,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/boltdb/bolt"
 )
 
 const BootstrapSequence = "00000000000000000000"
@@ -35,7 +36,7 @@ type ShardSnapshotFinder struct {
 	SnapshotPath   string
 	LocalPath      string
 	Stream         string
-	ShardID        string
+	ShardId        string
 }
 
 type ShardSnapshotter struct {
@@ -46,7 +47,7 @@ type ShardSnapshotter struct {
 	SnapshotPath   string
 	LocalPath      string
 	Stream         string
-	ShardID        string
+	ShardId        string
 	DoneLag        int64
 }
 
@@ -59,7 +60,7 @@ func (s *ShardSnapshotter) Finder() *ShardSnapshotFinder {
 		SnapshotPath:   s.SnapshotPath,
 		LocalPath:      s.LocalPath,
 		Stream:         s.Stream,
-		ShardID:        s.ShardID,
+		ShardId:        s.ShardId,
 	}
 }
 
@@ -228,7 +229,7 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 }
 
 func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
-	copy := (fmt.Sprintf("%s/working-%s-%s-%d", s.LocalPath, s.Stream, s.ShardID, time.Now().UnixNano()))
+	copy := (fmt.Sprintf("%s/working-%s-%s-%d", s.LocalPath, s.Stream, s.ShardId, time.Now().UnixNano()))
 	return copy, exec.Command("mv", snapshot.LocalFile, copy).Run()
 }
 
@@ -263,7 +264,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator after=%s", latest)
 		gsi := &kinesis.GetShardIteratorInput{
 			StreamName:             aws.String(s.Stream),
-			ShardID:                aws.String(s.ShardID),
+			ShardId:                aws.String(s.ShardId),
 			ShardIteratorType:      aws.String(kinesis.ShardIteratorTypeAfterSequenceNumber),
 			StartingSequenceNumber: aws.String(latest),
 		}
@@ -391,7 +392,7 @@ func (s *ShardSnapshotter) DeleteSnapshotsInS3OlderThan(age time.Duration) (*s3.
 }
 
 func (s *ShardSnapshotFinder) S3Prefix() string {
-	return fmt.Sprintf("%s/%s-%s-", s.SnapshotPath, s.Stream, s.ShardID)
+	return fmt.Sprintf("%s/%s-%s-", s.SnapshotPath, s.Stream, s.ShardId)
 }
 
 type Snapshot struct {
@@ -402,7 +403,7 @@ type Snapshot struct {
 }
 
 func (s *ShardSnapshotFinder) SnapshotFromS3Key(s3key string) *Snapshot {
-	prefixes := []string{s.SnapshotPath, "/", s.Stream, "-", s.ShardID, "-"}
+	prefixes := []string{s.SnapshotPath, "/", s.Stream, "-", s.ShardId, "-"}
 	suffix := ".boltdb"
 
 	trimmed := s3key
@@ -427,7 +428,7 @@ func (s *ShardSnapshotFinder) SnapshotFromS3Key(s3key string) *Snapshot {
 }
 
 func (s *ShardSnapshotFinder) SnapshotFromKinesisSeq(kinesisSeq string) Snapshot {
-	snapshotFilename := fmt.Sprintf("%s-%s-%s.boltdb", s.Stream, s.ShardID, kinesisSeq)
+	snapshotFilename := fmt.Sprintf("%s-%s-%s.boltdb", s.Stream, s.ShardId, kinesisSeq)
 	s3Key := fmt.Sprintf("%s/%s", s.SnapshotPath, snapshotFilename)
 	local := fmt.Sprintf("%s/%s", s.LocalPath, snapshotFilename)
 	local, err := filepath.Abs(local)
