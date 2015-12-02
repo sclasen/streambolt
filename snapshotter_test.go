@@ -198,6 +198,44 @@ func TestIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	thirdTotal, err := PutData(snapshotter.KinesisClient, snapshotter.Stream)
+
+	query := ShardQueryDB{
+		Finder: snapshotter.Finder(),
+		Updater: snapshotter.Generator,
+		KinesisClient: snapshotter.KinesisClient,
+		UpdateInterval: 1 * time.Second,
+	}
+
+	err = query.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = query.Query(func(tx *bolt.Tx) error {
+		tx.Bucket(keycounts).Stats()
+		return nil
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(5 * time.Second)
+
+	query.Stop()
+
+	ss3, err := query.Finder.FindLatestSnapshot() //finds the snapshot we used. ss3.LocalPath will be updated by QueryUpdater.
+
+	thirdVerifyTotal, err := TotalSnapshot(*ss3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if total+secondTotal+thirdTotal != thirdVerifyTotal {
+		t.Fatal(total, secondTotal, secondVerifyTotal)
+	}
+
 	out, err := snapshotter.DeleteSnapshotsInS3OlderThan(1 * time.Nanosecond)
 	if err != nil || len(out.Errors) > 0 {
 		t.Fatal(out, err)
