@@ -12,6 +12,7 @@ import (
 )
 
 type QueryDBUpdater interface {
+	OnStart(*bolt.Tx) error
 	OnRecords(*bolt.Tx, *kinesis.GetRecordsOutput) error
 }
 
@@ -63,6 +64,8 @@ func (d *ShardQueryDB) Start() error {
 		return err
 	}
 
+	d.db.Update(d.Updater.OnStart)
+
 	go d.applyUpdates(ss.KinesisSeq)
 
 	return nil
@@ -73,8 +76,8 @@ func (d *ShardQueryDB) Stop() {
 	close(d.stopUpdating)
 	<-d.stoppedUpdating
 	d.db.Close()
+	d.db = nil
 	log.Printf("component=shard-query fn=stop at=stopped")
-
 }
 
 func (d *ShardQueryDB) applyUpdates(startingAfter string) {

@@ -201,9 +201,9 @@ func TestIntegration(t *testing.T) {
 	thirdTotal, err := PutData(snapshotter.KinesisClient, snapshotter.Stream)
 
 	query := ShardQueryDB{
-		Finder: snapshotter.Finder(),
-		Updater: snapshotter.Generator,
-		KinesisClient: snapshotter.KinesisClient,
+		Finder:         snapshotter.Finder(),
+		Updater:        snapshotter.Generator,
+		KinesisClient:  snapshotter.KinesisClient,
 		UpdateInterval: 1 * time.Second,
 	}
 
