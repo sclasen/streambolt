@@ -222,7 +222,7 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 	_, err = io.Copy(f, out.Body)
 
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=download-snapshot at=copoy-error error=%s", err)
+		log.Printf("component=shard-snapshotter fn=download-snapshot at=copy-error error=%s", err)
 	}
 
 	return err
