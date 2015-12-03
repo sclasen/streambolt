@@ -145,9 +145,12 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 					log.Printf("component=shard-query fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
 
 					iterator = gr.NextShardIterator
-					err = d.db.Update(func(tx *bolt.Tx) error {
-						return d.Updater.OnRecords(tx, gr)
-					})
+
+					if r := len(gr.Records); r > 0 {
+						err = d.db.Update(func(tx *bolt.Tx) error {
+							return d.Updater.OnRecords(tx, gr)
+						})
+					}
 
 					if err != nil {
 						log.Printf("component=shard-query fn=update-snapshot at=on-records-error error=%s", err)
