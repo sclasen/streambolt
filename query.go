@@ -92,7 +92,7 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 			close(d.stoppedUpdating)
 			return
 		case <-trigger:
-			log.Printf("component=shard-query fn=update-snapshot at=get-iterator after=%s", latest)
+			log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=get-iterator after=%s", d.Finder.Stream, d.Finder.ShardId, latest)
 			gsi := &kinesis.GetShardIteratorInput{
 				StreamName:             aws.String(d.Finder.Stream),
 				ShardId:                aws.String(d.Finder.ShardId),
@@ -108,7 +108,7 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 			it, err := d.KinesisClient.GetShardIterator(gsi)
 
 			if err != nil {
-				log.Printf("component=shard-query fn=update-snapshot at=get-iterator-error error=%s", err)
+				log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=get-iterator-error error=%s", d.Finder.Stream, d.Finder.ShardId, err)
 				time.AfterFunc(d.UpdateInterval, func() {
 					trigger <- fire
 				})
@@ -116,7 +116,12 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 			}
 
 			iterator := it.ShardIterator
+			if iterator == nil {
+				log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=shard-closed", d.Finder.Stream, d.Finder.ShardId)
+				return
+			}
 			trigger <- fire
+		ITERATOR:
 			for {
 				select {
 				case <-d.stopUpdating:
@@ -129,22 +134,27 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 					if err != nil {
 						if aerr, ok := err.(awserr.Error); ok {
 							if aerr.Code() == "ExpiredIteratorException" {
-								log.Printf("component=shard-query fn=update-snapshot at=expired-iterator")
+								log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s  at=expired-iterator", d.Finder.Stream, d.Finder.ShardId)
 								trigger <- fire
-								break
+								break ITERATOR
 							}
-						} else {
-							log.Printf("component=shard-query fn=update-snapshot at=get-records-error error=%s", err)
-							time.AfterFunc(d.UpdateInterval, func() {
-								trigger <- fire
-							})
-							break
 						}
+
+						log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=get-records-error error=%s", d.Finder.Stream, d.Finder.ShardId, err)
+						time.AfterFunc(d.UpdateInterval, func() {
+							trigger <- fire
+						})
+						break ITERATOR
+
 					}
 
-					log.Printf("component=shard-query fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
+					log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=get-records records=%d behind=%d", d.Finder.Stream, d.Finder.ShardId, len(gr.Records), *gr.MillisBehindLatest)
 
 					iterator = gr.NextShardIterator
+					if iterator == nil {
+						log.Printf("component=shard-query fn=update-snapshot-iterator stream=%s shard=%s at=shard-closed", d.Finder.Stream, d.Finder.ShardId)
+						return
+					}
 
 					if r := len(gr.Records); r > 0 {
 						err = d.db.Update(func(tx *bolt.Tx) error {
@@ -153,7 +163,7 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 					}
 
 					if err != nil {
-						log.Printf("component=shard-query fn=update-snapshot at=on-records-error error=%s", err)
+						log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=on-records-error error=%s", d.Finder.Stream, d.Finder.ShardId, err)
 					}
 
 					if r := len(gr.Records); r > 0 {
