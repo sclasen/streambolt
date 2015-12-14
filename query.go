@@ -117,7 +117,7 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 
 			iterator := it.ShardIterator
 			if iterator == nil {
-				log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=shard-closed", d.Finder.Stream, d.Finder.ShardId, err)
+				log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=shard-closed", d.Finder.Stream, d.Finder.ShardId)
 				return
 			}
 			trigger <- fire
@@ -152,7 +152,7 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 
 					iterator = gr.NextShardIterator
 					if iterator == nil {
-						log.Printf("component=shard-query fn=update-snapshot-iterator stream=%s shard=%s at=shard-closed", d.Finder.Stream, d.Finder.ShardId, err)
+						log.Printf("component=shard-query fn=update-snapshot-iterator stream=%s shard=%s at=shard-closed", d.Finder.Stream, d.Finder.ShardId)
 						return
 					}
 
