@@ -133,13 +133,14 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 								trigger <- fire
 								break
 							}
-						} else {
-							log.Printf("component=shard-query fn=update-snapshot at=get-records-error error=%s", err)
-							time.AfterFunc(d.UpdateInterval, func() {
-								trigger <- fire
-							})
-							break
 						}
+
+						log.Printf("component=shard-query fn=update-snapshot at=get-records-error error=%s", err)
+						time.AfterFunc(d.UpdateInterval, func() {
+							trigger <- fire
+						})
+						break
+
 					}
 
 					log.Printf("component=shard-query fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
