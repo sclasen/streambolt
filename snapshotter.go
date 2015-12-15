@@ -326,8 +326,6 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 			}
 		}
 	}
-
-	return "", errors.New("unreachable reached")
 }
 
 func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error {
