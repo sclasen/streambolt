@@ -282,6 +282,10 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 		}
 
 		iterator := it.ShardIterator
+		if iterator == nil {
+			log.Printf("component=shard-snapshotter fn=update-snapshot stream=%s shard=%s at=shard-closed", s.Stream, s.ShardId)
+			return "", nil
+		}
 
 		for {
 			gr, err := s.KinesisClient.GetRecords(&kinesis.GetRecordsInput{
@@ -301,6 +305,10 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
 
 			iterator = gr.NextShardIterator
+			if iterator == nil {
+				log.Printf("component=shard-snapshotter fn=update-snapshot stream=%s shard=%s at=shard-closed", s.Stream, s.ShardId)
+				return "", nil
+			}
 
 			err = s.Generator.OnRecords(tx, gr)
 			if err != nil {
