@@ -152,7 +152,7 @@ func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	latest := big.NewInt(0)
+	latest := big.NewInt(-1)
 	var latestSnap *Snapshot
 
 	for _, ss := range snapshots {
