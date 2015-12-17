@@ -124,17 +124,33 @@ func TestIntegration(t *testing.T) {
 		t.Fatal("NIL SNAPSHOTTER")
 	}
 
-	total, err := PutData(snapshotter.KinesisClient, snapshotter.Stream)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ss, err := snapshotter.SnapshotShard()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	finder := snapshotter.Finder()
+	ss, err = finder.FindLatestSnapshot()
+	if err != nil || ss == nil {
+		t.Fatal(err, ss)
+	}
+
+	err = os.Remove(ss.LocalFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	total, err := PutData(snapshotter.KinesisClient, snapshotter.Stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ss, err = snapshotter.SnapshotShard()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	finder = snapshotter.Finder()
 	ss, err = finder.FindLatestSnapshot()
 	if err != nil || ss == nil {
 		t.Fatal(err, ss)

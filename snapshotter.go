@@ -152,7 +152,7 @@ func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	latest := big.NewInt(0)
+	latest := big.NewInt(-1)
 	var latestSnap *Snapshot
 
 	for _, ss := range snapshots {
@@ -164,7 +164,7 @@ func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
 		}
 	}
 
-	if latest.Cmp(big.NewInt(0)) == 0 {
+	if latest.Cmp(big.NewInt(-1)) == 0 {
 		log.Printf("component=shard-snapshotter fn=find-latest-snapshot at=no-snapshots")
 		return nil, nil
 	}
