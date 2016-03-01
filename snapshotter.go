@@ -296,10 +296,9 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 					if aerr.Code() == "ExpiredIteratorException" {
 						break
 					}
-				} else {
-					log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records-error error=%s", err)
-					return "", err
 				}
+				log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records-error error=%s", err)
+				return "", err
 			}
 
 			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
