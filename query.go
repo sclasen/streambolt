@@ -2,13 +2,15 @@ package streambolt
 
 import (
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 	"github.com/boltdb/bolt"
-	"log"
-	"time"
+	"github.com/rcrowley/go-metrics"
 )
 
 type QueryDBUpdater interface {
@@ -17,10 +19,13 @@ type QueryDBUpdater interface {
 }
 
 type ShardQueryDB struct {
-	Finder          *ShardSnapshotFinder
-	Updater         QueryDBUpdater
-	KinesisClient   kinesisiface.KinesisAPI
-	UpdateInterval  time.Duration
+	Finder         *ShardSnapshotFinder
+	Updater        QueryDBUpdater
+	KinesisClient  kinesisiface.KinesisAPI
+	UpdateInterval time.Duration
+	// MetricsRegistry will have statistics about requests reported to it,
+	// rather then logged.
+	MetricsRegistry metrics.Registry
 	stopUpdating    chan struct{}
 	stoppedUpdating chan struct{}
 	db              *bolt.DB
@@ -148,7 +153,13 @@ func (d *ShardQueryDB) applyUpdates(startingAfter string) {
 
 					}
 
-					log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=get-records records=%d behind=%d", d.Finder.Stream, d.Finder.ShardId, len(gr.Records), *gr.MillisBehindLatest)
+					if d.MetricsRegistry != nil {
+						metrics.GetOrRegisterCounter(fmt.Sprintf("streambolt.queryer.%s.%s.polls", d.Finder.Stream, d.Finder.ShardId), d.MetricsRegistry).Inc(1)
+						// Would we want to histo/summarize this? or is "point in time" ok.
+						metrics.GetOrRegisterGauge(fmt.Sprintf("streambolt.queryer.%s.%s.lagms", d.Finder.Stream, d.Finder.ShardId), d.MetricsRegistry).Update(*gr.MillisBehindLatest)
+					} else {
+						log.Printf("component=shard-query fn=update-snapshot stream=%s shard=%s at=get-records records=%d behind=%d", d.Finder.Stream, d.Finder.ShardId, len(gr.Records), *gr.MillisBehindLatest)
+					}
 
 					iterator = gr.NextShardIterator
 					if iterator == nil {
