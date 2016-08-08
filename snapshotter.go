@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/boltdb/bolt"
+	"github.com/rcrowley/go-metrics"
 )
 
 const BootstrapSequence = "00000000000000000000"
@@ -49,6 +50,9 @@ type ShardSnapshotter struct {
 	Stream         string
 	ShardId        string
 	DoneLag        int64
+	// MetricsRegistry will have statistics about requests reported to it,
+	// rather then logged.
+	MetricsRegistry metrics.Registry
 }
 
 //TODO ListSnapshots and DeleteShapshot for GCing. or maybe just GCBefore(time.Time)
@@ -301,7 +305,13 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 				return "", err
 			}
 
-			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
+			if s.MetricsRegistry != nil {
+				metrics.GetOrRegisterCounter(fmt.Sprintf("streambolt.snapshotter.%s.%s.polls", s.Stream, s.ShardId), s.MetricsRegistry).Inc(1)
+				// Would we want to histo/summarize this? or is "point in time" ok.
+				metrics.GetOrRegisterGauge(fmt.Sprintf("streambolt.snapshotter.%s.%s.lagms", s.Stream, s.ShardId), s.MetricsRegistry).Update(*gr.MillisBehindLatest)
+			} else {
+				log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
+			}
 
 			iterator = gr.NextShardIterator
 			if iterator == nil {
