@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"os/exec"
+	"io/ioutil"
 )
 
 func TestSnapshots(t *testing.T) {
@@ -353,3 +355,38 @@ func (s *TestSnapshotGen) OnRecords(tx *bolt.Tx, gro *kinesis.GetRecordsOutput) 
 	}
 	return nil
 }
+
+func TestCompactingLocalCopy(t *testing.T) {
+	if testDB := os.Getenv("COPMACTION_TEST_DB"); testDB != "" {
+		source, _ := ioutil.TempFile("","")
+		destDir, _ := ioutil.TempDir("","")
+		exec.Command("cp", testDB, source.Name()).Run()
+		snap := &ShardSnapshotter{
+			LocalPath:destDir,
+			Stream:"stream",
+			ShardId:"shard",
+			CompactDB: true,
+		}
+
+		dest, err := snap.ToWorkingCopy(Snapshot{LocalFile:source.Name()})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ss, err := os.Stat(source.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		ds, err := os.Stat(dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		log.Printf("compacted source-size=%d dest-size=%d", ss.Size(), ds.Size())
+
+		if ds.Size() >= ss.Size() {
+			t.Fatal("compression produced no improvement, did the source DB have any deleted keys ever?")
+		}
+	}
+}
+
