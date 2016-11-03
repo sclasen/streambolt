@@ -48,11 +48,13 @@ snapshotter := &ShardSnapshotter{
 				ShardId:        shardId,
 				DoneLag:        10,
 				Generator:      &MySnapshotGen{},
+				CompactDB:      true,
 			}
 
 //finds/downloads latest snapshot, or bootstraps it.
 //updates the snapshot until the kinesis consumer is caught up.
 //uploads the new latest snapshot.
+//NOTE: if you set CompactDB to true, you must have the `bolt` binary in your path to successfully snapshot.
 snapshotter.SnapshotShard()
 
 ```
