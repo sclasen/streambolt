@@ -349,6 +349,7 @@ func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error
 		}
 		log.Printf("component=shard-snapshotter fn=from-working-copy at=compaction-error status=fallback-to-simple-mv error=%q", compactErr)
 	}
+	log.Println("component=shard-snapshotter fn=from-working-copy at=simple-mv")
 	return exec.Command("mv", file, snapshot.LocalFile).Run()
 }
 
