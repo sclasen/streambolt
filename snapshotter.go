@@ -231,28 +231,7 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 
 func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
 	copy := (fmt.Sprintf("%s/working-%s-%s-%d", s.LocalPath, s.Stream, s.ShardId, time.Now().UnixNano()))
-	if s.CompactDB {
-		compactErr := exec.Command("bolt", "compact", "-o", copy, snapshot.LocalFile).Run()
-		if compactErr == nil {
-			ss, serr := os.Stat(snapshot.LocalFile)
-			ds, derr := os.Stat(copy)
-			before := int64(-1)
-			after := int64(-1)
-			if serr == nil {
-				before = ss.Size()
-			}
-			if derr == nil {
-				after = ds.Size()
-			}
-
-			log.Printf("component=shard-snapshotter fn=to-working-copy at=compacted-working-copy size-before=%d size-after=%d", before, after)
-
-			return copy, nil
-		}
-		log.Printf("component=shard-snapshotter fn=to-working-copy at=compaction-error status=fallback-to-simple-copy error=%q", compactErr)
-	}
 	return copy, exec.Command("mv", snapshot.LocalFile, copy).Run()
-
 }
 
 func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSequence string) (string, error) {
@@ -350,6 +329,26 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 }
 
 func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error {
+	if s.CompactDB {
+		compactErr := exec.Command("bolt", "compact", "-o", snapshot.LocalFile, file).Run()
+		if compactErr == nil {
+			ss, serr := os.Stat(file)
+			ds, derr := os.Stat(snapshot.LocalFile)
+			before := int64(-1)
+			after := int64(-1)
+			if serr == nil {
+				before = ss.Size()
+			}
+			if derr == nil {
+				after = ds.Size()
+			}
+
+			log.Printf("component=shard-snapshotter fn=from-working-copy at=compacted-working-copy size-before=%d size-after=%d", before, after)
+
+			return nil
+		}
+		log.Printf("component=shard-snapshotter fn=from-working-copy at=compaction-error status=fallback-to-simple-mv error=%q", compactErr)
+	}
 	return exec.Command("mv", file, snapshot.LocalFile).Run()
 }
 
