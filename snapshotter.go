@@ -232,10 +232,14 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
 	copy := (fmt.Sprintf("%s/working-%s-%s-%d", s.LocalPath, s.Stream, s.ShardId, time.Now().UnixNano()))
 	if s.CompactDB {
-		return copy, exec.Command("bolt", "compact", "-o", copy, snapshot.LocalFile).Run()
-	} else {
-		return copy, exec.Command("mv", snapshot.LocalFile, copy).Run()
+		compactErr := exec.Command("bolt", "compact", "-o", copy, snapshot.LocalFile).Run()
+		if compactErr == nil {
+			return copy, nil
+		}
+		log.Printf("component=shard-snapshotter fn=download-snapshot at=compaction-error status=fallback-to-simple-copy error=%q", compactErr)
 	}
+	return copy, exec.Command("mv", snapshot.LocalFile, copy).Run()
+
 }
 
 func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSequence string) (string, error) {
