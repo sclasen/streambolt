@@ -180,7 +180,9 @@ func (s *ShardSnapshotter) BootstrapSnapshot() (*Snapshot, error) {
 		log.Printf("component=shard-snapshotter fn=bootstrap-snapshot at=bolt-open-error error=%s", err)
 		return nil, err
 	}
-	defer db.Close()
+	defer func(){
+		_ = db.Close()
+	}()
 
 	updatedSeq := ""
 
@@ -199,8 +201,15 @@ func (s *ShardSnapshotter) BootstrapSnapshot() (*Snapshot, error) {
 	}
 
 	snapshot := s.Finder().SnapshotFromKinesisSeq(updatedSeq)
-	s.FromWorkingCopy(init.LocalFile, snapshot)
-	return &snapshot, nil
+
+	//Need to close db before compacting it.
+	err = db.Close()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &snapshot, s.FromWorkingCopy(init.LocalFile, snapshot)
 }
 
 func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
@@ -329,6 +338,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 }
 
 func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error {
+	log.Println("component=shard-snapshotter fn=from-working-copy at=start")
 	if s.CompactDB {
 		compactErr := exec.Command("bolt", "compact", "-o", snapshot.LocalFile, file).Run()
 		if compactErr == nil {
