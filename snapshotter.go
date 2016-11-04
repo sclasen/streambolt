@@ -234,7 +234,19 @@ func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
 	if s.CompactDB {
 		compactErr := exec.Command("bolt", "compact", "-o", copy, snapshot.LocalFile).Run()
 		if compactErr == nil {
-			log.Println("component=shard-snapshotter fn=to-working-copy at=compacted-working-copy")
+			ss, serr := os.Stat(snapshot.LocalFile)
+			ds, derr := os.Stat(copy)
+			before := int64(-1)
+			after := int64(-1)
+			if serr == nil {
+				before = ss.Size()
+			}
+			if derr == nil {
+				after = ds.Size()
+			}
+
+			log.Printf("component=shard-snapshotter fn=to-working-copy at=compacted-working-copy size-before=%d size-after=%d", before, after)
+
 			return copy, nil
 		}
 		log.Printf("component=shard-snapshotter fn=to-working-copy at=compaction-error status=fallback-to-simple-copy error=%q", compactErr)
