@@ -209,7 +209,7 @@ func (s *ShardSnapshotter) BootstrapSnapshot() (*Snapshot, error) {
 		return nil, err
 	}
 
-	return &snapshot, s.FromWorkingCopy(init.LocalFile, snapshot)
+	return &snapshot, nil
 }
 
 func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
@@ -340,6 +340,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error {
 	log.Println("component=shard-snapshotter fn=from-working-copy at=start")
 	if s.CompactDB {
+		log.Println("component=shard-snapshotter fn=from-working-copy at=compact")
 		compactErr := exec.Command("bolt", "compact", "-o", snapshot.LocalFile, file).Run()
 		if compactErr == nil {
 			ss, serr := os.Stat(file)

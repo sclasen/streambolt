@@ -116,6 +116,7 @@ func TestIntegration(t *testing.T) {
 				ShardId:        *o.StreamDescription.Shards[0].ShardId,
 				DoneLag:        10,
 				Generator:      &TestSnapshotGen{},
+				CompactDB:      true,
 			}
 			break
 		}
@@ -428,4 +429,19 @@ func compactionTestDB() string {
 	log.Println("wrote compaction test db")
 	db.Close()
 	return dbf.Name()
+}
+
+func TestBootstrapWithCompaction(t *testing.T) {
+	local, _ := ioutil.TempDir("", "local")
+	s := &ShardSnapshotter{
+		Stream:       "my-stream-name",
+		ShardId:      "shardId-000000000000",
+		SnapshotPath: "snapshots",
+		LocalPath:    local,
+		Generator:    &TestSnapshotGen{},
+		CompactDB:    true,
+
+	}
+
+	s.BootstrapSnapshot()
 }
