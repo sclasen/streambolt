@@ -7,9 +7,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/boltdb/bolt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -114,6 +116,7 @@ func TestIntegration(t *testing.T) {
 				ShardId:        *o.StreamDescription.Shards[0].ShardId,
 				DoneLag:        10,
 				Generator:      &TestSnapshotGen{},
+				CompactDB:      true,
 			}
 			break
 		}
@@ -352,4 +355,93 @@ func (s *TestSnapshotGen) OnRecords(tx *bolt.Tx, gro *kinesis.GetRecordsOutput) 
 
 	}
 	return nil
+}
+
+func TestCompactingLocalCopy(t *testing.T) {
+	testDB := os.Getenv("COPMACTION_TEST_DB")
+
+	if testDB == "" {
+		testDB = compactionTestDB()
+	} else {
+		log.Printf("Using COMPACTION_TEST_DB")
+	}
+
+	source, _ := ioutil.TempFile("", "")
+	destDir, _ := ioutil.TempDir("", "")
+	exec.Command("cp", testDB, source.Name()).Run()
+	snap := &ShardSnapshotter{
+		LocalPath: destDir,
+		Stream:    "stream",
+		ShardId:   "shard",
+		CompactDB: true,
+	}
+
+	ss := snap.Finder().SnapshotFromKinesisSeq(BootstrapSequence)
+
+	err := snap.FromWorkingCopy(source.Name(), ss)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	src, err := os.Stat(source.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ds, err := os.Stat(ss.LocalFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log.Printf("compacted source-size=%d dest-size=%d", src.Size(), ds.Size())
+
+	if ds.Size() >= src.Size() {
+		t.Fatal("compression produced no improvement, did the source DB have any deleted keys ever?")
+	}
+
+}
+
+func compactionTestDB() string {
+	dbf, err := ioutil.TempFile("", "")
+	db, err := bolt.Open(dbf.Name(), 0600, nil)
+
+	if err != nil {
+		panic(err)
+	}
+
+	db.Update(func(tx *bolt.Tx) error {
+		data, err := tx.CreateBucketIfNotExists([]byte("data"))
+		if err != nil {
+			panic(err)
+		}
+		//fill up db
+		for i := 0; i < 100000; i++ {
+			datum := []byte(fmt.Sprintf("datum-%d", i))
+			data.Put(datum, datum)
+		}
+		//delete half
+		for i := 0; i < 100000; i += 2 {
+			datum := []byte(fmt.Sprintf("datum-%d", i))
+			data.Delete(datum)
+		}
+		return nil
+	})
+
+	log.Println("wrote compaction test db")
+	db.Close()
+	return dbf.Name()
+}
+
+func TestBootstrapWithCompaction(t *testing.T) {
+	local, _ := ioutil.TempDir("", "local")
+	s := &ShardSnapshotter{
+		Stream:       "my-stream-name",
+		ShardId:      "shardId-000000000000",
+		SnapshotPath: "snapshots",
+		LocalPath:    local,
+		Generator:    &TestSnapshotGen{},
+		CompactDB:    true,
+
+	}
+
+	s.BootstrapSnapshot()
 }
