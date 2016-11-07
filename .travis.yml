@@ -3,5 +3,5 @@ go: 1.7.1
 before_install:
   - export PATH=$HOME/gopath/bin:$PATH
   - go get ./...
-script: make travis
+script: go test -v ./...
 sudo: false
