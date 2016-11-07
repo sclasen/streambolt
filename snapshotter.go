@@ -92,10 +92,10 @@ func (s *ShardSnapshotter) SnapshotShard() (*Snapshot, error) {
 		}
 		updatedSeq, err := s.UpdateWorkingCopy(working, latest.KinesisSeq)
 		if err != nil {
-			log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-updating-working-copy removing=%s", working)
+			log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-updating-working-copy removing=%s", s.ShardId, working)
 			re := os.Remove(working)
 			if re != nil {
-				log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-removing-working-copy copy=%s", working)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-removing-working-copy copy=%s", s.ShardId, working)
 			}
 			return nil, err
 		}
@@ -103,10 +103,10 @@ func (s *ShardSnapshotter) SnapshotShard() (*Snapshot, error) {
 		err = s.FromWorkingCopy(working, updatedSnapshot)
 		if err != nil {
 			if err != nil {
-				log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-moving-working-copy removing=%s", working)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-moving-working-copy removing=%s", s.ShardId, working)
 				re := os.Remove(working)
 				if re != nil {
-					log.Printf("component=shard-snapshotter fn=snapshot-shard at=error-removing-working-copy copy=%s", working)
+					log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-removing-working-copy copy=%s", s.ShardId, working)
 				}
 				return nil, err
 			}
@@ -125,13 +125,13 @@ func (s *ShardSnapshotter) SnapshotShard() (*Snapshot, error) {
 func (s *ShardSnapshotFinder) FindSnapshots() ([]Snapshot, error) {
 	snapshots := []Snapshot{}
 	eachPage := func(o *s3.ListObjectsOutput, _ bool) bool {
-		log.Printf("component=shard-snapshotter fn=snapshot-shard at=list-objects-page")
+		log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=list-objects-page", s.ShardId)
 		for _, obj := range o.Contents {
 			if ss := s.SnapshotFromS3Key(*obj.Key); ss != nil {
 				snapshots = append(snapshots, *ss)
-				log.Printf("component=shard-snapshotter fn=snapshot-shard at=snapshot-key key=%s", *obj.Key)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=snapshot-key key=%s", s.ShardId, *obj.Key)
 			} else {
-				log.Printf("component=shard-snapshotter fn=snapshot-shard at=non-snapshot-key key=%s", *obj.Key)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=non-snapshot-key key=%s", s.ShardId, *obj.Key)
 			}
 		}
 		return false
@@ -142,7 +142,7 @@ func (s *ShardSnapshotFinder) FindSnapshots() ([]Snapshot, error) {
 	}, eachPage)
 
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=snapshot-shard at=list-objects-error error=%s", err)
+		log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=list-objects-error error=%s", s.ShardId, err)
 		return nil, err
 	}
 	return snapshots, nil
@@ -166,10 +166,10 @@ func (s *ShardSnapshotFinder) FindLatestSnapshot() (*Snapshot, error) {
 	}
 
 	if latest.Cmp(big.NewInt(-1)) == 0 {
-		log.Printf("component=shard-snapshotter fn=find-latest-snapshot at=no-snapshots")
+		log.Printf("component=shard-snapshotter shard-id=%s fn=find-latest-snapshot at=no-snapshots", s.ShardId)
 		return nil, nil
 	}
-	log.Printf("component=shard-snapshotter fn=find-latest-snapshot at=snapshot snapshot=%s", latestSnap.S3Key)
+	log.Printf("component=shard-snapshotter shard-id=%s fn=find-latest-snapshot at=snapshot snapshot=%s", s.ShardId, latestSnap.S3Key)
 	return latestSnap, nil
 }
 
@@ -177,10 +177,10 @@ func (s *ShardSnapshotter) BootstrapSnapshot() (*Snapshot, error) {
 	init := s.Finder().SnapshotFromKinesisSeq(BootstrapSequence)
 	db, err := bolt.Open(init.LocalFile, 0600, nil)
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=bootstrap-snapshot at=bolt-open-error error=%s", err)
+		log.Printf("component=shard-snapshotter shard-id=%s fn=bootstrap-snapshot at=bolt-open-error error=%s", s.ShardId, err)
 		return nil, err
 	}
-	defer func(){
+	defer func() {
 		_ = db.Close()
 	}()
 
@@ -189,7 +189,7 @@ func (s *ShardSnapshotter) BootstrapSnapshot() (*Snapshot, error) {
 	err = db.Update(func(tx *bolt.Tx) error {
 		seq, err := s.Generator.Bootstrap(tx)
 		if err != nil {
-			log.Printf("component=shard-snapshotter fn=bootstrap-snapshot at=error error=%s", err)
+			log.Printf("component=shard-snapshotter shard-id=%s fn=bootstrap-snapshot at=error error=%s", s.ShardId, err)
 			return err
 		}
 		updatedSeq = seq
@@ -218,7 +218,7 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 		Key:    aws.String(snapshot.S3Key),
 	})
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=download-snapshot at=get-obj-error error=%s", err)
+		log.Printf("component=shard-snapshotter shard-id=%s fn=download-snapshot at=get-obj-error error=%s", s.ShardId, err)
 		return err
 	}
 	f, err := os.Create(snapshot.LocalFile)
@@ -232,7 +232,7 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 	_, err = io.Copy(f, out.Body)
 
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=download-snapshot at=copy-error error=%s", err)
+		log.Printf("component=shard-snapshotter shard-id=%s fn=download-snapshot at=copy-error error=%s", s.ShardId, err)
 	}
 
 	return err
@@ -246,7 +246,7 @@ func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
 func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSequence string) (string, error) {
 	db, err := bolt.Open(workingCopyFilename, 0600, nil)
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=update-working-copy at=bolt-open-error error=%s", err)
+		log.Printf("component=shard-snapshotter shard-id=%s fn=update-working-copy at=bolt-open-error error=%s", s.ShardId, err)
 		return "", err
 	}
 	defer db.Close()
@@ -256,7 +256,7 @@ func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSeq
 	err = db.Update(func(tx *bolt.Tx) error {
 		err = s.Generator.OnStart(tx)
 		if err != nil {
-			log.Printf("component=shard-snapshotter fn=update-working-copy at=on-start-error error=%s", err)
+			log.Printf("component=shard-snapshotter shard-id=%s fn=update-working-copy at=on-start-error error=%s", s.ShardId, err)
 			return err
 		}
 		updatedSeq, err = s.UpdateSnapshot(tx, lastSequence)
@@ -271,7 +271,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 	latest := startingAfter
 	for {
 
-		log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator after=%s", latest)
+		log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot at=get-iterator after=%s", s.ShardId, latest)
 		gsi := &kinesis.GetShardIteratorInput{
 			StreamName:             aws.String(s.Stream),
 			ShardId:                aws.String(s.ShardId),
@@ -287,13 +287,13 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 		it, err := s.KinesisClient.GetShardIterator(gsi)
 
 		if err != nil {
-			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-iterator-error error=%s", err)
+			log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot at=get-iterator-error error=%s", s.ShardId, err)
 			return "", err
 		}
 
 		iterator := it.ShardIterator
 		if iterator == nil {
-			log.Printf("component=shard-snapshotter fn=update-snapshot stream=%s shard=%s at=shard-closed", s.Stream, s.ShardId)
+			log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot stream=%s shard=%s at=shard-closed", s.ShardId, s.Stream, s.ShardId)
 			return "", nil
 		}
 
@@ -307,21 +307,21 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 						break
 					}
 				}
-				log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records-error error=%s", err)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot at=get-records-error error=%s", s.ShardId, err)
 				return "", err
 			}
 
-			log.Printf("component=shard-snapshotter fn=update-snapshot at=get-records records=%d behind=%d", len(gr.Records), *gr.MillisBehindLatest)
+			log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot at=get-records records=%d behind=%d", s.ShardId, len(gr.Records), *gr.MillisBehindLatest)
 
 			iterator = gr.NextShardIterator
 			if iterator == nil {
-				log.Printf("component=shard-snapshotter fn=update-snapshot stream=%s shard=%s at=shard-closed", s.Stream, s.ShardId)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot stream=%s shard=%s at=shard-closed", s.ShardId, s.Stream, s.ShardId)
 				return "", nil
 			}
 
 			err = s.Generator.OnRecords(tx, gr)
 			if err != nil {
-				log.Printf("component=shard-snapshotter fn=update-snapshot at=on-records-error error=%s", err)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot at=on-records-error error=%s", s.ShardId, err)
 				return "", err
 			}
 
@@ -330,7 +330,7 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 			}
 
 			if *gr.MillisBehindLatest < s.DoneLag {
-				log.Printf("component=shard-snapshotter fn=update-snapshot at=done behind=%d done-lag=%d", *gr.MillisBehindLatest, s.DoneLag)
+				log.Printf("component=shard-snapshotter shard-id=%s fn=update-snapshot at=done behind=%d done-lag=%d", s.ShardId, *gr.MillisBehindLatest, s.DoneLag)
 				return latest, nil
 			}
 		}
@@ -338,9 +338,9 @@ func (s *ShardSnapshotter) UpdateSnapshot(tx *bolt.Tx, startingAfter string) (st
 }
 
 func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error {
-	log.Println("component=shard-snapshotter fn=from-working-copy at=start")
+	log.Printf("component=shard-shapshotter shard-id=%s fn=from-working-copy at=start", s.ShardId)
 	if s.CompactDB {
-		log.Println("component=shard-snapshotter fn=from-working-copy at=compact")
+		log.Printf("component=shard-shapshotter shard-id=%s fn=from-working-copy at=compact", s.ShardId)
 		compactErr := exec.Command("bolt", "compact", "-o", snapshot.LocalFile, file).Run()
 		if compactErr == nil {
 			ss, serr := os.Stat(file)
@@ -354,13 +354,13 @@ func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error
 				after = ds.Size()
 			}
 
-			log.Printf("component=shard-snapshotter fn=from-working-copy at=compacted-working-copy size-before=%d size-after=%d", before, after)
+			log.Printf("component=shard-shapshotter shard-id=%s fn=from-working-copy at=compacted-working-copy size-before=%d size-after=%d", s.ShardId, before, after)
 
 			return nil
 		}
-		log.Printf("component=shard-snapshotter fn=from-working-copy at=compaction-error status=fallback-to-simple-mv error=%q", compactErr)
+		log.Printf("component=shard-shapshotter shard-id=%s fn=from-working-copy at=compaction-error status=fallback-to-simple-mv error=%q", s.ShardId, compactErr)
 	}
-	log.Println("component=shard-snapshotter fn=from-working-copy at=simple-mv")
+	log.Printf("component=shard-shapshotter shard-id=%s fn=from-working-copy at=simple-mv", s.ShardId)
 	return exec.Command("mv", file, snapshot.LocalFile).Run()
 }
 
@@ -390,7 +390,7 @@ func (s *ShardSnapshotter) DeleteSnapshotsInS3OlderThan(age time.Duration) (*s3.
 				oi := &s3.ObjectIdentifier{
 					Key: c.Key,
 				}
-				log.Printf("component=shard-snapshotter fn=delete-snapshots at=found-deleteable modified=%s key=%s", *c.LastModified, *c.Key)
+				log.Printf("component=shard-shapshotter shard-id=%s fn=delete-snapshots at=found-deleteable modified=%s key=%s", s.ShardId, *c.LastModified, *c.Key)
 				toDelete = append(toDelete, oi)
 			}
 		}
@@ -403,12 +403,12 @@ func (s *ShardSnapshotter) DeleteSnapshotsInS3OlderThan(age time.Duration) (*s3.
 	}, eachPage)
 
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=delete-snapshots at=list-error error=%s", err)
+		log.Printf("component=shard-shapshotter shard-id=%s fn=delete-snapshots at=list-error error=%s", s.ShardId, err)
 		return nil, err
 	}
 
 	if len(toDelete) == 0 {
-		log.Printf("component=shard-snapshotter fn=delete-snapshots at=no-eligible-snapshots")
+		log.Printf("component=shard-shapshotter shard-id=%s fn=delete-snapshots at=no-eligible-snapshots", s.ShardId)
 		return &s3.DeleteObjectsOutput{}, nil
 	}
 
@@ -420,9 +420,9 @@ func (s *ShardSnapshotter) DeleteSnapshotsInS3OlderThan(age time.Duration) (*s3.
 	})
 
 	if err != nil {
-		log.Printf("component=shard-snapshotter fn=delete-snapshots at=delete-objects-error error=%s", err)
+		log.Printf("component=shard-shapshotter shard-id=%s fn=delete-snapshots at=delete-objects-error error=%s", s.ShardId, err)
 	} else {
-		log.Printf("component=shard-snapshotter fn=delete-snapshots at=sent-delete-objects num-errors=%d", len(out.Errors))
+		log.Printf("component=shard-shapshotter shard-id=%s fn=delete-snapshots at=sent-delete-objects num-errors=%d", s.ShardId, len(out.Errors))
 	}
 
 	return out, err
