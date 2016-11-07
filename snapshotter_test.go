@@ -418,6 +418,14 @@ func compactionTestDB() string {
 			datum := []byte(fmt.Sprintf("datum-%d", i))
 			data.Put(datum, datum)
 		}
+		return nil
+	})
+
+	db.Update(func(tx *bolt.Tx) error {
+		data, err := tx.CreateBucketIfNotExists([]byte("data"))
+		if err != nil {
+			panic(err)
+		}
 		//delete half
 		for i := 0; i < 100000; i += 2 {
 			datum := []byte(fmt.Sprintf("datum-%d", i))
