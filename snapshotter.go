@@ -1,7 +1,6 @@
 package streambolt
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -85,41 +84,38 @@ func (s *ShardSnapshotter) SnapshotShard() (*Snapshot, error) {
 		latest = l
 	}
 
-	if latest != nil {
-		working, err := s.ToWorkingCopy(*latest)
-		if err != nil {
-			return nil, err
+	working, err := s.ToWorkingCopy(*latest)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := os.Remove(working); err != nil && !os.IsNotExist(err) {
+			log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-removing-working-copy copy=%s", s.ShardId, working)
 		}
-		updatedSeq, err := s.UpdateWorkingCopy(working, latest.KinesisSeq)
-		if err != nil {
-			log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-updating-working-copy removing=%s", s.ShardId, working)
-			re := os.Remove(working)
-			if re != nil {
-				log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-removing-working-copy copy=%s", s.ShardId, working)
-			}
-			return nil, err
-		}
-		updatedSnapshot := finder.SnapshotFromKinesisSeq(updatedSeq)
-		err = s.FromWorkingCopy(working, updatedSnapshot)
-		if err != nil {
-			if err != nil {
-				log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-moving-working-copy removing=%s", s.ShardId, working)
-				re := os.Remove(working)
-				if re != nil {
-					log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-removing-working-copy copy=%s", s.ShardId, working)
-				}
-				return nil, err
-			}
-			return nil, err
-		}
-		err = s.UploadSnapshot(updatedSnapshot)
-		if err != nil {
-			return nil, err
-		}
-		return &updatedSnapshot, nil
+	}()
+
+	updatedSeq, err := s.UpdateWorkingCopy(working, latest.KinesisSeq)
+	if err != nil {
+		log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-updating-working-copy removing=%s", s.ShardId, working)
+		return nil, err
 	}
 
-	return nil, errors.New("no snapshot generated")
+	updatedSnapshot := finder.SnapshotFromKinesisSeq(updatedSeq)
+
+	err = s.FromWorkingCopy(working, updatedSnapshot)
+	if err != nil {
+		_ = os.Remove(updatedSnapshot.LocalFile)
+		log.Printf("component=shard-snapshotter shard-id=%s fn=snapshot-shard at=error-moving-working-copy removing=%s", s.ShardId, working)
+		return nil, err
+	}
+
+	err = s.UploadSnapshot(updatedSnapshot)
+	if err != nil {
+		_ = os.Remove(updatedSnapshot.LocalFile)
+		return nil, err
+	}
+
+	return &updatedSnapshot, nil
 }
 
 func (s *ShardSnapshotFinder) FindSnapshots() ([]Snapshot, error) {
@@ -239,8 +235,8 @@ func (s *ShardSnapshotFinder) DownloadSnapshot(snapshot Snapshot) error {
 }
 
 func (s *ShardSnapshotter) ToWorkingCopy(snapshot Snapshot) (string, error) {
-	copy := (fmt.Sprintf("%s/working-%s-%s-%d", s.LocalPath, s.Stream, s.ShardId, time.Now().UnixNano()))
-	return copy, exec.Command("mv", snapshot.LocalFile, copy).Run()
+	copy := fmt.Sprintf("%s/working-%s-%s-%d", s.LocalPath, s.Stream, s.ShardId, time.Now().UnixNano())
+	return copy, os.Rename(snapshot.LocalFile, copy)
 }
 
 func (s *ShardSnapshotter) UpdateWorkingCopy(workingCopyFilename string, lastSequence string) (string, error) {
@@ -361,7 +357,7 @@ func (s *ShardSnapshotter) FromWorkingCopy(file string, snapshot Snapshot) error
 		log.Printf("component=shard-shapshotter shard-id=%s fn=from-working-copy at=compaction-error status=fallback-to-simple-mv error=%q", s.ShardId, compactErr)
 	}
 	log.Printf("component=shard-shapshotter shard-id=%s fn=from-working-copy at=simple-mv", s.ShardId)
-	return exec.Command("mv", file, snapshot.LocalFile).Run()
+	return os.Rename(file, snapshot.LocalFile)
 }
 
 func (s *ShardSnapshotter) UploadSnapshot(snapshot Snapshot) error {
